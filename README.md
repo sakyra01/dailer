@@ -112,4 +112,8 @@ $ python3 dailer.py --last 3 report
     docker run expdd
     ```
 
+# TO DO LIST:
+1. Переветси на анг весь текст
+2. Update фреймворка в plugin к DefectDojo
+
 

@@ -1,0 +1,52 @@
+@startuml Sequence Diagram - Images
+!define AWSPuml https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v16.0/dist
+
+!include AWSPuml/AWSCommon.puml
+!include AWSPuml/AWSExperimental.puml
+!include AWSPuml/DeveloperTools/CloudControlAPI.puml
+!include AWSPuml/Database/DynamoDB.puml
+!include AWSPuml/Compute/EC2DBInstance.puml
+!include AWSPuml/Compute/GenomicsCLI.puml
+!include AWSPuml/ManagementGovernance/Chatbot.puml
+!include AWSPuml/Compute/Outpostsservers.puml
+!include AWSPuml/ApplicationIntegration/SimpleNotificationServiceHTTPNotification.puml
+
+
+hide footbox
+skinparam style strictuml
+skinparam MaxMessageSize 200
+
+
+box Local Business Network
+participant "$ChatbotIMG()\n Infosec_critical" as alert_bot << Rocket.Chat >>
+participant "$EC2DBInstanceIMG()\n Main Program\n Python-3.10" as main_program << Docker Image >>
+participant "$CloudControlAPIIMG()\n API \n Methods:GET,POST" as api << DefectDojo >>
+participant "$OutpostsserversIMG()\n 10.67.50.74:8888 " as proxy << Proxy Server >>
+endbox
+
+box External network
+participant "$SimpleNotificationServiceHTTPNotificationIMG()\n CVE plugins" as tenable << Tenable.com >>
+endbox
+
+main_program -> api++ $AWSColor(DeveloperTools): <$Callout_1> GET request\l "/api/v2/findings/"
+return (Status code) (Count of findings)
+
+main_program -> api++ $AWSColor(DeveloperTools): <$Callout_2> GET request\l "/api/v2/findings/{count}"
+return findings data
+
+main_program -> tenable++ $AWSColor(ApplicationIntegration): <$Callout_3> Parsing HTML with timesleep
+return Tenable HTML
+
+main_program -> main_program++ $AWSColor(Compute): <$Callout_4> Get 'VPR Score' and\l 'Exploit Available' values
+return new tenable tags
+
+main_program -> main_program++ $AWSColor(Compute): <$Callout_5> Exploit-db library usage...
+return new exploit_db tag
+
+main_program -> main_program++ $AWSColor(Compute): <$Callout_6> Make alerting list...
+return alerting list
+
+main_program -> alert_bot++ $AWSColor(ManagementGovernance): <$Callout_7> Send alerting list
+return (Status code)
+
+@enduml

@@ -1,14 +1,10 @@
 # Dailer framework
 
-<div style="text-align: center;">
+<p align="center">
       <img src="app/images/Dailer.png" alt="Image" width="400" />
-</div>
+</p>
 
 [![python version](https://img.shields.io/badge/Python-3.11%2B-brightgreen)](https://www.python.org/downloads/)
-
-**Структура** 📄
-
-[[_TOC_]]
 
 # Description
 **Dailer - это фреймворк, который сканирует файндинги в DefectDojo в нескольких режимах и выполняет определенные действия. Сканирование производится с помошью API DefectDojo.** 

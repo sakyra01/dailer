@@ -1,13 +1,14 @@
 from .nist import nist
 from .cve_search import search_cve_in_finding_fields
-from .connections import logger, check_connection_pedb, get_findings_data, year, statistic_message, send_alerts_messages
+from .connections import *
 from .exploit_db import exploit_db
 from .rm_tags import rm_tags
 from .cisa import cisa_checker
 from .epss import epss_checker
 from .updating_tags import update_tags
-from .alerts_options import alerting_checker, first_writer_alert, make_alert_report
-from .statistic import statistic_report
+from .alerts_options import alerting_checker, first_writer_alert
+from .statistic import  statistic_report
+from .alerts_options import make_alert_report
 import re
 
 
@@ -17,9 +18,9 @@ def balancer(arg, report_flag):
 
     # Start script
     if type(arg) == list:
-        logger.info("===START script with --last option===")
+        logger.info(f"===START Framework with --last option for last {len(arg)} days===")
     else:
-        logger.info(f"===START script with {arg} option===")
+        logger.info(f"===START Framework with {arg} option===")
 
     # Update DB exploit-db from https://gitlab.com/exploit-database/exploitdb + check connection to python library pyDb
     if arg != "--remove_tags":
@@ -27,9 +28,10 @@ def balancer(arg, report_flag):
         logger.info("Exploit-db local DB updated successfully")
 
     # Requests with limit&offset step by 1000 findings
+    count = get_count()
     offset = 0
     for step in range(10000):
-        content = get_findings_data(offset)  # Get response of findings from DefectDojo
+        content = get_findings_data(offset, count)  # Get response of findings from DefectDojo
 
         if content != 0:
             enumeration(content, arg)  # Run main function
@@ -38,18 +40,13 @@ def balancer(arg, report_flag):
         else:
             break
 
-    if report_flag is True:
-        # Send statistic information in Rocketchat
-        message = statistic_report(arg)
-        statistic_message(message)
-
-        # Send alert information in Rocketchat
-        alert_message = make_alert_report()
-        if alert_message is not None:
-            send_alerts_messages(alert_message)
-
     # Stop script
-    logger.info(f"===STOP script===")
+    logger.info(f"===STOP Framework===")
+
+    # Make full stack of notifications if we have subflag {report}
+    if report_flag is True:
+        notifications(arg)
+
     return
 
 
@@ -133,6 +130,8 @@ def cve_contains_checker(f_cve, f_title, f_description, f_references, f_id):
 
 
 def cve_year_checker(cve_id):
+    if cve_id is None:
+        return False
     pattern = r"\d{4}"
     matches = re.findall(pattern, cve_id)
 
@@ -155,3 +154,16 @@ def cve_date_compare_for_last_option(args_list, f_date):
             status = True
 
     return status
+
+
+def notifications(arg):
+    # Send statistic information in Rocketchat and Telegram
+    message = statistic_report(arg)
+    statistic_message(message)
+    telegram_notification(message)
+
+    # Send alert information in Rocketchat
+    alert_message = make_alert_report()
+    if alert_message is not None:
+        send_alerts_messages(alert_message)
+        telegram_alerts(alert_message)

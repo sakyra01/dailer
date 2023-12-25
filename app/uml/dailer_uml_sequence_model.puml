@@ -1,0 +1,132 @@
+@startuml Sequence Diagram - Images
+!define AWSPuml https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v16.0/dist
+
+!pragma teoz true
+!include AWSPuml/AWSCommon.puml
+!include AWSPuml/AWSExperimental.puml
+!include AWSPuml/Storage/FileCache.puml
+!include AWSPuml/Database/Aurora.puml
+!include AWSPuml/General/SourceCode.puml
+!include AWSPuml/Compute/Outpostsservers.puml
+!include AWSPuml/DeveloperTools/CommandLineInterface.puml
+
+hide footbox
+skinparam style strictuml
+skinparam MaxMessageSize 200
+
+
+participant "$CommandLineInterfaceIMG()\n Console" as console << console >>
+
+box "Dailer framework"
+   participant "$SourceCodeIMG()\n dailer" as main_program << .py >>
+   box "App"
+      participant "$FileCacheIMG()\n Images" as images << Images file >>
+      participant "$FileCacheIMG()\n UML" as uml << UML file >>
+      participant "$AuroraIMG()\n CISA CVE Database" as cisa_db << Cisa.com >>
+      participant "$OutpostsserversIMG()\n Exploit-db" as exploit_db << py library >>
+      box "Logs"
+         participant "$FileCacheIMG()\n Log file" as log_file << logfile.log >>
+         participant "$FileCacheIMG()\n alert_list" as alert_list << Alert list >>
+      endbox
+      box "Modules"
+         participant "$SourceCodeIMG()\n alerts_options" as alerts_options << .py >>
+         participant "$SourceCodeIMG()\n banner" as banner << .py >>
+         participant "$SourceCodeIMG()\n cisa" as cisa << .py >>
+         participant "$SourceCodeIMG()\n cve_search" as cve_search << .py >>
+         participant "$SourceCodeIMG()\n epss" as epss << .py >>
+         participant "$SourceCodeIMG()\n enum" as enum << .py >>
+         participant "$SourceCodeIMG()\n exploit_db" as exploit_db_code << .py >>
+         participant "$SourceCodeIMG()\n connections" as connections << .py >>
+         participant "$SourceCodeIMG()\n last_option_enum" as last_option << .py >>
+         participant "$SourceCodeIMG()\n nist" as nist << .py >>
+         participant "$SourceCodeIMG()\n picker" as piker << .py >>
+         participant "$SourceCodeIMG()\n rm_tags" as rm_tags << .py >>
+         participant "$SourceCodeIMG()\n statistic" as statistic << .py >>
+         participant "$SourceCodeIMG()\n updating_tags" as updating_tags << .py >>
+      endbox
+   endbox
+endbox
+
+participant "$OutpostsserversIMG()\n DD API" as dd_api << DefectDojo >>
+participant "$OutpostsserversIMG()\n NIST API" as nist_api << NVD NIST >>
+participant "$OutpostsserversIMG()\n CISA DB" as cisa_db_source << cisa.com >>
+participant "$OutpostsserversIMG()\n EPSS API" as epss_api << first.org >>
+participant "$OutpostsserversIMG()\n Messenger" as messenger << Chat >>
+
+console -> main_program++ $AWSColor(DeveloperTools): (1) python3 dailer.py\l "[flags] {subflag}"
+main_program -> banner++: Get banner
+return Banner
+return Banner
+
+main_program -> cisa++: (2) Start updating cisa DB
+cisa -> cisa_db_source++ $AWSColor(Compute): (3) Request to cisa source for new information
+return New Database of CVE's
+cisa -> cisa_db++ $AWSColor(DeveloperTools): (4) Updating local cisa database (only once a day with local condition )
+return CISA Database Status
+main_program -> piker++: (5) Arguments [flags] {subflag}
+piker --> piker++: (6) Make options and choose the way of work
+piker -> enum++: (7) Send arguments and options for enumeration
+
+log_file --> log_file++ $AWSColor(Storage): Record all info
+
+enum -> exploit_db++ $AWSColor(Compute): (8) Git request to updating exploit-db library
+return Status Exploit-db Database
+enum -> connections++: (9) Make loop with paginations requests to DefectDojo\l (step 1000 findings)
+connections -> dd_api++ $AWSColor(Compute): (10) Request to API
+return Response Information about findings
+
+enum -> cve_search++: (11) Find information about CVE in data
+return CVE OR None
+
+enum -> nist++: (12) Work nist function
+nist -> connections++: (13) Work nist function
+connections -> nist_api++ $AWSColor(Compute): (14) Request to NVD NIST API
+return Response of NIST information about CVE
+nist -> nist++: (15) Make tags from data information
+nist -> enum++: (16) Return List of NIST tags or None
+
+
+enum -> exploit_db_code++: (17) Find CVE in Exploit-db DB
+return exploit-db tag or None
+
+enum -> cisa++: (18) Find CVE in Exploit-db DB
+cisa -> cisa_db++ $AWSColor(DeveloperTools): (19) Find CVE in CISA DB
+return cisa tag or None
+return cisa tag or none
+
+enum -> epss++: (20) Work epss function
+epss -> connections++: (21) Work epss function
+connections -> epss_api++ $AWSColor(Compute): (22) Request to First.org API
+return Response of First.org about CVE
+epss -> epss++: (23) Make tag from data information
+epss -> enum++: (24) Return epss tag or None
+
+enum --> enum++: (25) Make list of new tags
+return List of new tags
+
+enum -> updating_tags++: (26) Send new_list in calc function
+updating_tags -> updating_tags++: (27) Calc old tags and new tags
+return actual_list of tags
+updating_tags -> connections++: (28) Send actual list of tags
+connections -> dd_api++: (29) Patch tags on current finding
+return Status code of post request
+
+enum -> alerts_options++: (30) Try to work function with spesific conditions
+alerts_options -> alert_list++: (31) Build alert_list to send message in messenger
+return Status of alert list
+
+enum -> statistic++: (32) Make statistic message to Chat
+return message
+enum -> messenger++ $AWSColor(Compute): (33) Send statistic message to chanel in Messanger by WEBHOOK
+return Status of request
+
+enum -> alerts_options ++: (34) Make alert message to Chat
+return message
+enum -> messenger++ $AWSColor(Compute): (35) Send alert message to chanel in Messanger by WEBHOOK
+return Status of request
+
+enum --> enum++: (36) Out of loop
+return End of program
+
+
+@enduml

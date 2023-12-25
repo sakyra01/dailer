@@ -19,7 +19,7 @@ def print_banner():
             ;   :  .'   ;  :   .'   \;  :    ;|  ,   / |   :    | ---'     
             |   ,.'     |  ,     .-./|  ,   /  ---`-'   \   \  /           
             '---'        `--`---'     ---`-'             `----'                                                              
-                                    Version 2.7
+                                    Version 3.0
         """)
 
     print(f"""{BColors.info}    
@@ -43,3 +43,4 @@ def print_banner():
             ~$ python3 dailer.py [-l/--last] [-re/--report] (5-th option)
         """)
     print(f"{BColors.standart}")
+    

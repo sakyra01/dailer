@@ -13,7 +13,7 @@ def alerting_checker(list_of_tags, f_scanner_id, finding_id):
 
             # (OR) Condition for tags: epss_critical, exploit-db, cisa, exploitability_critical values.
             if ("epss_critical" in list_of_tags) or ("exploit-db" in list_of_tags) or ("cisa" in list_of_tags) or ("exploitability_critical" in list_of_tags):
-                product_checker(finding_id, current_scanner_name)
+                product_checker(finding_id, current_scanner_name, list_of_tags)
             # (AND) Condition for tags: av_n, ac_l, pr_n, base_critical
             elif ("av_n" in list_of_tags) and ("ac_l" in list_of_tags) and ("pr_n" in list_of_tags) and ("base_critical" in list_of_tags):
                 product_checker(finding_id, current_scanner_name, list_of_tags)
@@ -53,13 +53,14 @@ def find_scaner_namez(finding_scanner_id):
 
 def product_checker(finding_id, current_scanner_name, list_of_tags):
     data = get_products(finding_id)
-    product_name = data['related_fields']['test']['engagement']['product']['name']
-    product_prod_type_name = data['related_fields']['test']['engagement']['product']['prod_type']['name']
+    if len(data) > 2:
+        product_name = data['related_fields']['test']['engagement']['product']['name']
+        product_prod_type_name = data['related_fields']['test']['engagement']['product']['prod_type']['name']
 
-    if (product_name == 'perimeter EXT X5D') or (product_prod_type_name == 'WEB applications EXT'):
-        message = f"Found Critical vulnerability for finding - {url}{finding_id}. Scanner - {current_scanner_name}. Tags-{list_of_tags}\n"
-        vulnerability_list(message)
-        return
+        if (product_name == 'perimeter EXT X5D') or (product_prod_type_name == 'WEB applications EXT'):
+            message = f"Found Critical vulnerability for finding - {url}{finding_id}. Scanner - {current_scanner_name}. Tags-{list_of_tags}\n"
+            vulnerability_list(message)
+            return
 
 
 def first_writer_alert():
@@ -86,6 +87,7 @@ def make_alert_report():
     alert_file.close()
     if vulns_counter == 1:
         alert_message = None
+    alert_file.close()
     return alert_message
 
 

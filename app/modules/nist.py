@@ -7,16 +7,19 @@ cvssv30 = 'cvssMetricV30'
 
 def nist(cve_id):
     nist_data = nist_connection(cve_id)
-    nvd_short = nist_data["vulnerabilities"][0]["cve"]["metrics"]
+    if len(nist_data["vulnerabilities"]) != 0:
+        nvd_short = nist_data["vulnerabilities"][0]["cve"]["metrics"]
 
-    # Here we are trying figure out which cvss version using by nvd nist
-    if cvssv30 in nvd_short:
-        nvd_tag_list = nvd_nist_searcher(cvssv30, nvd_short)
-        return nvd_tag_list
+        # Here we are trying figure out which cvss version using by nvd nist
+        if cvssv30 in nvd_short:
+            nvd_tag_list = nvd_nist_searcher(cvssv30, nvd_short)
+            return nvd_tag_list
 
-    elif cvssv31 in nvd_short:
-        nvd_tag_list = nvd_nist_searcher(cvssv31, nvd_short)
-        return nvd_tag_list
+        elif cvssv31 in nvd_short:
+            nvd_tag_list = nvd_nist_searcher(cvssv31, nvd_short)
+            return nvd_tag_list
+    else:
+        return None
 
 
 def nvd_nist_searcher(cvss, nvd_sh):
@@ -25,15 +28,23 @@ def nvd_nist_searcher(cvss, nvd_sh):
     nist_attack_vector = nvd_sh[cvss][0]["cvssData"]["attackVector"]
     nist_base_severity = nvd_sh[cvss][0]["cvssData"]["baseSeverity"]
     nist_attack_complexity = nvd_sh[cvss][0]["cvssData"]['attackComplexity']
+    nist_privileges_required = nvd_sh[cvss][0]["cvssData"]['privilegesRequired']
 
     nist_tag_list = nist_tagging(nist_exploit_score, nist_impact_score, nist_attack_vector, nist_base_severity,
-                                 nist_attack_complexity)
+                                 nist_attack_complexity, nist_privileges_required)
 
     return nist_tag_list
 
 
-def nist_tagging(nist_exploit_score, nist_impact_score, nist_attack_vector, nist_base_severity, nist_attack_complexity):
-    n_av = n_ac = n_is = n_bs = n_es = None
+def nist_tagging(nist_exploit_score, nist_impact_score, nist_attack_vector, nist_base_severity, nist_attack_complexity, nist_privileges_required):
+    n_av = n_ac = n_is = n_bs = n_es = pr = None
+
+    if "none" in nist_privileges_required.lower():
+        pr = "pr_n"
+    elif "low" in nist_privileges_required.lower():
+        pr = "pr_l"
+    elif "high" in nist_privileges_required.lower():
+        pr = "pr_h"
 
     # Nist attack vector
     if "network" in nist_attack_vector.lower():
@@ -87,5 +98,5 @@ def nist_tagging(nist_exploit_score, nist_impact_score, nist_attack_vector, nist
     elif 9.0 <= nist_exploit_score <= 10.0:
         n_es = "exploitability_critical"
 
-    nist_tag_list = [n_av, n_ac, n_is, n_bs, n_es]
+    nist_tag_list = [n_av, n_ac, n_is, n_bs, n_es, pr]
     return nist_tag_list

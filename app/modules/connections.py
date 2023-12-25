@@ -21,6 +21,7 @@ logger = logging.getLogger()
 # Network default settings
 url = os.getenv('URL')
 token = os.getenv('Token')
+max_retries = 1000
 
 proxies = {
    'https': 'http://10.67.50.74:8888',
@@ -32,50 +33,71 @@ def check_connection_pedb():
     pEdb.openFile()
 
 
-# Function get findings from DefectDojo
-def get_findings_data(offset):
-    path = f'{url}?limit=1000&offset={offset}/'
+def get_count():
+    path = f'{url}?limit=5&offset=0'
     headers = {'content-type': 'application/json', 'Authorization': token}
-
     try:
         r = requests.get(path, headers=headers, verify=True)    # set verify to False if ssl cert is self-signed
         r.raise_for_status()
-        # Check content for data
         full_content = r.json()
         count = full_content["count"]
-        content = full_content['results']
-        # Checking count of findings for timeout problem working of program
         if count > 50000:
             message = f"Alert! There are {count} findings in DefectDojo"
             print(message)
+            telegram_alerts(message)
             debug_message(message)
-        # Condition to exit from loop of requests
-        if offset > count:
+        return count
+    except requests.exceptions.RequestException:
+        message = f"Unreached DefectDojo source. File - (connections.py); Function - (get_count)"
+        print(message)
+        debug_message(message)
+        telegram_alerts(message)
+        exit(1)
+
+
+# Function get findings from DefectDojo
+def get_findings_data(offset, count):
+    path = f'{url}?limit=1000&offset={offset}'
+    headers = {'content-type': 'application/json', 'Authorization': token}
+    try:
+        r = requests.get(path, headers=headers, verify=True)    # set verify to False if ssl cert is self-signed
+        r.raise_for_status()
+        full_content = r.json()
+        content = full_content['results']
+        if offset > count:  # Condition to exit from loop of requests
             content = 0
         return content
     except requests.exceptions.RequestException:
         message = f"Unreached DefectDojo source. File - (connections.py); Function - (get_findings_data)"
         print(message)
         debug_message(message)
+        telegram_alerts(message)
         exit(1)
 
 
 # Function connect to NIST API and get data
 def nist_connection(cve_id):
-    api_key = os.getenv('NIST_API_KEY')
-    nist_url = os.getenv('NIST_URL')
-    nist_new_path = f"{nist_url}{cve_id}"
-    headers = {"apiKey": api_key}
+    retries = 0
+    while retries < max_retries:
+        api_key = os.getenv('NIST_API_KEY')
+        nist_url = os.getenv('NIST_URL')
+        nist_new_path = f"{nist_url}{cve_id}"
+        headers = {"apiKey": api_key}
 
-    try:
-        time.sleep(0.8)
-        response = requests.get(nist_new_path, headers=headers, proxies=proxies, timeout=5)
-        cve_data = response.json()
-        return cve_data
-    except requests.exceptions.RequestException:
+        try:
+            time.sleep(1)
+            response = requests.get(nist_new_path, headers=headers, proxies=proxies, timeout=5)
+            cve_data = response.json()
+            return cve_data
+        except requests.exceptions.RequestException:
+            retries += 1
+            time.sleep(10)
+    else:
         message = f"Unreached NIST source. File - (connections.py); Function - (nist_connection)"
+        logger.error(message)
         print(message)
         debug_message(message)
+        telegram_alerts(message)
         exit(1)
 
 
@@ -95,6 +117,7 @@ def post_new_tags(tags_list, finding_id):
         logger.error(message)
         print(message)
         debug_message(message)
+        telegram_alerts(message)
         exit(1)
 
 
@@ -117,12 +140,13 @@ def delete_tag(tag, f_id):
         logger.error(message)
         print(message)
         debug_message(message)
+        telegram_alerts(message)
     else:
         logger.info(f"Successfully remove tag {tag}. Finding - {f_id}")
 
 
 def get_products(finding_id):
-    path = f"https://defectdojo.x5food.tech/api/v2/findings/{finding_id}/?related_fields=true&engagement=%"
+    path = f"{url}{finding_id}/?related_fields=true&engagement=%"
     headers = {'content-type': 'application/json', 'Authorization': token}
     r = requests.get(path, headers=headers, verify=True)
     product = r.json()
@@ -135,7 +159,7 @@ def get_cisa_cve():
     headers = {'content-type': 'application/json'}
 
     try:
-        response = requests.get(cisa_path, headers=headers, proxies=proxies)
+        response = requests.get(cisa_path, headers=headers)  # proxies=proxies
         cisa_cve_list = response.json()['vulnerabilities']
         return cisa_cve_list
     except requests.exceptions.ConnectionError:
@@ -143,23 +167,29 @@ def get_cisa_cve():
         logger.error(message)
         print(message)
         debug_message(message)
+        telegram_alerts(message)
         exit(1)
 
 
 def get_epss(cve):
-    epss_path = os.getenv('EPSS_URL')
-    epss_cve_patch = f"{epss_path}{cve}"
-    headers = {'content-type': 'application/json'}
-
-    try:
-        response = requests.get(epss_cve_patch, headers=headers, proxies=proxies)
-        epss_data = response.json()
-        return epss_data
-    except requests.exceptions.ConnectionError:
+    retries = 0
+    while retries < max_retries:
+        epss_path = os.getenv('EPSS_URL')
+        epss_cve_patch = f"{epss_path}{cve}"
+        headers = {'content-type': 'application/json'}
+        try:
+            response = requests.get(epss_cve_patch, headers=headers, proxies=proxies)
+            epss_data = response.json()
+            return epss_data
+        except requests.exceptions.ConnectionError:
+            retries += 1
+            time.sleep(10)
+    else:
         message = f"Error connect to EPSS. File - (connections.py); Function - (get_epss)"
         logger.error(message)
         print(message)
         debug_message(message)
+        telegram_alerts(message)
         exit(1)
 
 
@@ -197,3 +227,31 @@ def send_alerts_messages(message):
         ]
     }
     requests.post(uri, headers={'content-type': 'application/json'}, json=data)
+
+
+def telegram_notification(message):
+    bot_token = os.getenv('Telegram_Token')
+    channel_id = os.getenv('Telegram_chanel_ID')
+
+    telegram_url = f'https://api.telegram.org/bot{bot_token}/sendDocument'
+    data = {
+        'chat_id': channel_id,
+        'caption': message
+    }
+
+    files = {
+        'document': open('logs/logfile.log', 'rb')
+    }
+    requests.post(telegram_url, data=data, files=files)
+
+
+def telegram_alerts(message):
+    bot_token = os.getenv('Telegram_Token')
+    channel_id = os.getenv('Telegram_chanel_ID')
+
+    telegram_url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
+    params = {
+        'chat_id': channel_id,
+        'text': message
+    }
+    requests.post(telegram_url, params=params)
